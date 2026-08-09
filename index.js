@@ -4,38 +4,33 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '50mb' }));
 
-// Base de données intelligente
-let cloudProducts = {}; // On stocke par nom/code-barres pour fusionner
+let cloudProducts = {}; 
 let cloudSales = {};
 
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
-// PUSH : On fusionne au lieu de tout écraser
+// PUSH : On enregistre les changements (Entrées ou Sorties)
 app.post('/sync/push', (req, res) => {
   const { products, sales } = req.body;
-  const now = Date.now();
-
-  // Fusion des produits : on garde toujours le plus récent ou la plus petite quantité (vente)
+  
   if (products) {
     products.forEach(p => {
       const key = p.name.trim().toLowerCase();
-      if (!cloudProducts[key] || p.qty < cloudProducts[key].qty) {
-         cloudProducts[key] = { ...p, lastSync: now };
-      }
+      // On accepte la nouvelle quantité, quelle qu'elle soit
+      cloudProducts[key] = { ...p, serverTime: Date.now() };
     });
   }
 
-  // Fusion des ventes
   if (sales) {
     sales.forEach(s => {
       cloudSales[s.num] = s;
     });
   }
 
-  res.status(200).json({ status: "Synced" });
+  res.status(200).json({ status: "OK" });
 });
 
-// PULL : On renvoie la base fusionnée
+// PULL : On renvoie les données à l'autre téléphone
 app.get('/sync/pull', (req, res) => {
   res.json({
     products: Object.values(cloudProducts),
@@ -43,4 +38,4 @@ app.get('/sync/pull', (req, res) => {
   });
 });
 
-app.listen(port, () => console.log('Cerveau Intelligent en ligne !'));
+app.listen(port, () => console.log('Serveur Temps Réel prêt !'));
