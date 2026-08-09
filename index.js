@@ -2,33 +2,34 @@ const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Augmentation de la limite pour accepter les photos (100 Mo)
 app.use(express.json({ limit: '100mb' }));
 
-// Mémoire universelle de la boutique
-let appTissuStore = {
-  products: [],
-  sales: [],
-  clients: [],
-  suppliers: [],
-  transactions: [],
-  movements: [],
-  workshop: [],
-  lastGlobalSync: Date.now()
-};
+let cloudProducts = {}; 
+let cloudSales = {};
 
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
-// PUSH : Le téléphone envoie TOUT son état actuel
 app.post('/sync/push', (req, res) => {
-  const data = req.body;
-  appTissuStore = { ...data, lastGlobalSync: Date.now() };
-  console.log("Mise à jour Miroir réussie !");
-  res.status(200).json({ status: "Success" });
+  const { products, sales } = req.body;
+  if (products) {
+    products.forEach(p => {
+      const key = p.name.trim().toLowerCase();
+      // On garde tout, y compris la photo
+      cloudProducts[key] = { ...p, serverTime: Date.now() };
+    });
+  }
+  if (sales) {
+    sales.forEach(s => { cloudSales[s.num] = s; });
+  }
+  res.status(200).json({ status: "OK" });
 });
 
-// PULL : L'autre téléphone récupère TOUT l'état actuel
 app.get('/sync/pull', (req, res) => {
-  res.json(appTissuStore);
+  res.json({
+    products: Object.values(cloudProducts),
+    sales: Object.values(cloudSales)
+  });
 });
 
-app.listen(port, () => console.log('Serveur Miroir Total en ligne !'));
+app.listen(port, () => console.log('Serveur Miroir avec Photos prêt !'));
