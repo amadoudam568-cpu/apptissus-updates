@@ -2,43 +2,45 @@ const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Permet de lire les gros volumes de données (tissus, ventes, etc.)
 app.use(express.json({ limit: '50mb' }));
 
-// Mémoire temporaire pour stocker vos données de boutique
-let cloudDatabase = {
-  products: [],
-  sales: [],
-  clients: [],
-  lastUpdated: Date.now()
-};
+// Base de données intelligente
+let cloudProducts = {}; // On stocke par nom/code-barres pour fusionner
+let cloudSales = {};
 
-// 1. Vérification de santé (pour le voyant VERT)
-app.get('/health', (req, res) => {
-  res.status(200).send('OK');
-});
+app.get('/health', (req, res) => res.status(200).send('OK'));
 
-// 2. ENVOYER des données au Cloud (Téléphone -> Serveur)
+// PUSH : On fusionne au lieu de tout écraser
 app.post('/sync/push', (req, res) => {
-  const authHeader = req.headers['authorization'];
-  console.log("Tentative de synchronisation reçue...");
-  
-  cloudDatabase = req.body; // On enregistre tout dans le cloud
-  cloudDatabase.lastUpdated = Date.now();
-  
-  console.log("Boutique mise à jour sur le Cloud !");
-  res.status(200).json({ status: "Success", message: "Données sauvegardées" });
+  const { products, sales } = req.body;
+  const now = Date.now();
+
+  // Fusion des produits : on garde toujours le plus récent ou la plus petite quantité (vente)
+  if (products) {
+    products.forEach(p => {
+      const key = p.name.trim().toLowerCase();
+      if (!cloudProducts[key] || p.qty < cloudProducts[key].qty) {
+         cloudProducts[key] = { ...p, lastSync: now };
+      }
+    });
+  }
+
+  // Fusion des ventes
+  if (sales) {
+    sales.forEach(s => {
+      cloudSales[s.num] = s;
+    });
+  }
+
+  res.status(200).json({ status: "Synced" });
 });
 
-// 3. RÉCUPÉRER les données du Cloud (Serveur -> Téléphone)
+// PULL : On renvoie la base fusionnée
 app.get('/sync/pull', (req, res) => {
-  res.json(cloudDatabase);
+  res.json({
+    products: Object.values(cloudProducts),
+    sales: Object.values(cloudSales)
+  });
 });
 
-app.get('/', (req, res) => {
-  res.send('<h1>Serveur AppTissu Connecté !</h1><p>Votre base de données partagée est prête.</p>');
-});
-
-app.listen(port, () => {
-  console.log('Cerveau Cloud en ligne sur le port ' + port);
-});
+app.listen(port, () => console.log('Cerveau Intelligent en ligne !'));
