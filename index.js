@@ -5,16 +5,11 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '100mb' }));
 
-// 🛡️ IDENTIFIANTS APP
 const CLOUD_USER = "admin_tissu";  
 const CLOUD_PASS = "Pass2026!";    
-
-// 🌍 LIEN MONGODB
 const MONGO_URI = "mongodb+srv://amadoudam568_db_user:mByDycFfVVC6ma9F@cluster0.myuegss.mongodb.net/apptissu?retryWrites=true&w=majority";
 
-mongoose.connect(MONGO_URI)
-  .then(() => console.log("✅ CONNECTÉ À MONGODB ATLAS"))
-  .catch(err => console.error("❌ ERREUR MONGODB :", err.message));
+mongoose.connect(MONGO_URI).then(() => console.log("✅ MongoDB Atlas Connected"));
 
 // MODÈLES
 const Product = mongoose.model('Product', new mongoose.Schema({}, { strict: false }));
@@ -23,15 +18,13 @@ const Client = mongoose.model('Client', new mongoose.Schema({}, { strict: false 
 const Transaction = mongoose.model('Transaction', new mongoose.Schema({}, { strict: false }));
 const Supplier = mongoose.model('Supplier', new mongoose.Schema({}, { strict: false }));
 const Category = mongoose.model('Category', new mongoose.Schema({}, { strict: false }));
-// NOUVEAUX : Commandes en ligne
 const OnlineOrder = mongoose.model('OnlineOrder', new mongoose.Schema({}, { strict: false }));
 const OnlineOrderItem = mongoose.model('OnlineOrderItem', new mongoose.Schema({}, { strict: false }));
 
 const checkAuth = (req, res, next) => {
   const auth = req.headers.authorization;
-  const expectedAuth = Buffer.from(`${CLOUD_USER}:${CLOUD_PASS}`).toString('base64');
-  if (auth === expectedAuth) return next();
-  res.status(401).send('Accès refusé');
+  if (auth === Buffer.from(`${CLOUD_USER}:${CLOUD_PASS}`).toString('base64')) return next();
+  res.status(401).send('Unauthorized');
 };
 
 app.get('/health', checkAuth, (req, res) => res.status(200).send('OK'));
@@ -46,10 +39,13 @@ app.post('/sync/push', checkAuth, async (req, res) => {
     if (suppliers) for (let s of suppliers) await Supplier.findOneAndUpdate({ name: s.name.trim() }, s, { upsert: true });
     if (categories) for (let c of categories) await Category.findOneAndUpdate({ name: c.name.trim() }, c, { upsert: true });
     
-    // Synchro des commandes
+    // Commandes en ligne
     if (onlineOrders) for (let o of onlineOrders) await OnlineOrder.findOneAndUpdate({ orderNumber: o.orderNumber }, o, { upsert: true });
-    if (onlineOrderItems) for (let oi of onlineOrderItems) await OnlineOrderItem.findOneAndUpdate({ onlineOrderId: oi.onlineOrderId, productId: oi.productId }, oi, { upsert: true });
-
+    if (onlineOrderItems) {
+      for (let oi of onlineOrderItems) {
+        await OnlineOrderItem.findOneAndUpdate({ orderNumber: oi.orderNumber, productName: oi.productName }, oi, { upsert: true });
+      }
+    }
     res.status(200).json({ status: "Success" });
   } catch (err) {
     res.status(500).send(err.message);
@@ -72,4 +68,4 @@ app.get('/sync/pull', checkAuth, async (req, res) => {
   }
 });
 
-app.listen(port, () => console.log('🚀 Serveur Miroir Universel avec Commandes prêt !'));
+app.listen(port, () => console.log('🚀 Server v5 ready'));
