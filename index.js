@@ -16,13 +16,16 @@ mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ CONNECTÉ À MONGODB ATLAS"))
   .catch(err => console.error("❌ ERREUR MONGODB :", err.message));
 
-// DÉFINITION DES MODÈLES (Univers Complet)
+// MODÈLES
 const Product = mongoose.model('Product', new mongoose.Schema({}, { strict: false }));
 const Sale = mongoose.model('Sale', new mongoose.Schema({}, { strict: false }));
 const Client = mongoose.model('Client', new mongoose.Schema({}, { strict: false }));
 const Transaction = mongoose.model('Transaction', new mongoose.Schema({}, { strict: false }));
 const Supplier = mongoose.model('Supplier', new mongoose.Schema({}, { strict: false }));
 const Category = mongoose.model('Category', new mongoose.Schema({}, { strict: false }));
+// NOUVEAUX : Commandes en ligne
+const OnlineOrder = mongoose.model('OnlineOrder', new mongoose.Schema({}, { strict: false }));
+const OnlineOrderItem = mongoose.model('OnlineOrderItem', new mongoose.Schema({}, { strict: false }));
 
 const checkAuth = (req, res, next) => {
   const auth = req.headers.authorization;
@@ -34,7 +37,7 @@ const checkAuth = (req, res, next) => {
 app.get('/health', checkAuth, (req, res) => res.status(200).send('OK'));
 
 app.post('/sync/push', checkAuth, async (req, res) => {
-  const { products, sales, clients, transactions, suppliers, categories } = req.body;
+  const { products, sales, clients, transactions, suppliers, categories, onlineOrders, onlineOrderItems } = req.body;
   try {
     if (products) for (let p of products) await Product.findOneAndUpdate({ name: p.name.trim() }, p, { upsert: true });
     if (sales) for (let s of sales) await Sale.findOneAndUpdate({ num: s.num }, s, { upsert: true });
@@ -42,8 +45,12 @@ app.post('/sync/push', checkAuth, async (req, res) => {
     if (transactions) for (let t of transactions) await Transaction.findOneAndUpdate({ desc: t.desc, date: t.date }, t, { upsert: true });
     if (suppliers) for (let s of suppliers) await Supplier.findOneAndUpdate({ name: s.name.trim() }, s, { upsert: true });
     if (categories) for (let c of categories) await Category.findOneAndUpdate({ name: c.name.trim() }, c, { upsert: true });
+    
+    // Synchro des commandes
+    if (onlineOrders) for (let o of onlineOrders) await OnlineOrder.findOneAndUpdate({ orderNumber: o.orderNumber }, o, { upsert: true });
+    if (onlineOrderItems) for (let oi of onlineOrderItems) await OnlineOrderItem.findOneAndUpdate({ onlineOrderId: oi.onlineOrderId, productId: oi.productId }, oi, { upsert: true });
 
-    res.status(200).json({ status: "Universal Sync Success" });
+    res.status(200).json({ status: "Success" });
   } catch (err) {
     res.status(500).send(err.message);
   }
@@ -57,10 +64,12 @@ app.get('/sync/pull', checkAuth, async (req, res) => {
     const transactions = await Transaction.find();
     const suppliers = await Supplier.find();
     const categories = await Category.find();
-    res.json({ products, sales, clients, transactions, suppliers, categories });
+    const onlineOrders = await OnlineOrder.find();
+    const onlineOrderItems = await OnlineOrderItem.find();
+    res.json({ products, sales, clients, transactions, suppliers, categories, onlineOrders, onlineOrderItems });
   } catch (err) {
     res.status(500).send(err.message);
   }
 });
 
-app.listen(port, () => console.log('🚀 Serveur Miroir Universel MongoDB prêt !'));
+app.listen(port, () => console.log('🚀 Serveur Miroir Universel avec Commandes prêt !'));
