@@ -3,13 +3,13 @@ const mongoose = require('mongoose');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '50mb' })); // On réduit la limite pour la stabilité
+app.use(express.json({ limit: '100mb' }));
 
 const CLOUD_USER = "admin_tissu";  
 const CLOUD_PASS = "Pass2026!";    
 const MONGO_URI = "mongodb+srv://amadoudam568_db_user:mByDycFfVVC6ma9F@cluster0.myuegss.mongodb.net/apptissu?retryWrites=true&w=majority";
 
-mongoose.connect(MONGO_URI).then(() => console.log("✅ Miroir Pro v9 - Stabilité Max"));
+mongoose.connect(MONGO_URI).then(() => console.log("✅ Miroir Pro v10 - Sync Totale"));
 
 const schemas = { strict: false };
 const Product = mongoose.model('Product', new mongoose.Schema({}, schemas));
@@ -38,6 +38,12 @@ app.post('/sync/push', checkAuth, async (req, res) => {
         await OnlineOrder.findOneAndUpdate({ orderNumber: o.orderNumber }, o, { upsert: true });
       }
     }
+    // NOUVEAU v10 : Sauvegarde des articles
+    if (data.onlineOrderItems) {
+      for (let oi of data.onlineOrderItems) {
+        await OnlineOrderItem.findOneAndUpdate({ orderNumber: oi.orderNumber, productName: oi.productName }, oi, { upsert: true });
+      }
+    }
     
     res.status(200).json({ status: "Synced" });
   } catch (err) { res.status(500).send(err.message); }
@@ -49,10 +55,11 @@ app.get('/sync/pull', checkAuth, async (req, res) => {
       products: await Product.find().limit(500),
       sales: await Sale.find().sort({date: -1}).limit(100),
       clients: await Client.find(),
-      onlineOrders: await OnlineOrder.find().sort({date: -1}).limit(50)
+      onlineOrders: await OnlineOrder.find().sort({date: -1}).limit(50),
+      onlineOrderItems: await OnlineOrderItem.find().limit(200) // ON ENVOIE ENFIN LES ARTICLES !
     };
     res.json(results);
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.listen(port, () => console.log('🚀 Server v9 ready'));
+app.listen(port, () => console.log('🚀 Server v10 ready'));
