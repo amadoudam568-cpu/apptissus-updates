@@ -26,31 +26,30 @@ const checkAuth = (req, res, next) => {
   res.status(401).send('Unauthorized');
 };
 
-// ⚡ FONCTION TURBO : ENREGISTREMENT GROUPÉ
-async function bulkUpsert(model, data, filterKey) {
+// ⚡ FONCTION TURBO
+async function bulkUpsert(model, data, filterKeys) {
   if (!data || data.length === 0) return;
-  const ops = data.map(item => ({
-    updateOne: {
-      filter: { [filterKey]: item[filterKey] },
-      update: { $set: item },
-      upsert: true
-    }
-  }));
+  const ops = data.map(item => {
+    let filter = {};
+    filterKeys.forEach(k => filter[k] = item[k]);
+    return { updateOne: { filter, update: { $set: item }, upsert: true } };
+  });
   await model.bulkWrite(ops);
 }
+
+app.get('/health', checkAuth, (req, res) => res.status(200).send('OK'));
 
 app.post('/sync/push', checkAuth, async (req, res) => {
   const d = req.body;
   try {
-    // On enregistre tout en mode "Turbo"
     await Promise.all([
-      bulkUpsert(Product, d.products, 'name'),
-      bulkUpsert(Sale, d.sales, 'num'),
-      bulkUpsert(Client, d.clients, 'name'),
-      bulkUpsert(OnlineOrder, d.onlineOrders, 'orderNumber'),
-      bulkUpsert(OnlineOrderItem, d.onlineOrderItems, 'productName'),
-      bulkUpsert(Workshop, d.workshop, 'num'),
-      bulkUpsert(Lookbook, d.lookbook, 'date')
+      bulkUpsert(Product, d.products, ['name']),
+      bulkUpsert(Sale, d.sales, ['num']),
+      bulkUpsert(Client, d.clients, ['name']),
+      bulkUpsert(OnlineOrder, d.onlineOrders, ['orderNumber']),
+      bulkUpsert(OnlineOrderItem, d.onlineOrderItems, ['orderNumber', 'productName']),
+      bulkUpsert(Workshop, d.workshop, ['num']),
+      bulkUpsert(Lookbook, d.lookbook, ['date'])
     ]);
     res.status(200).json({ status: "Turbo Synced" });
   } catch (err) { res.status(500).send(err.message); }
@@ -71,4 +70,4 @@ app.get('/sync/pull', checkAuth, async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.listen(port, () => console.log('🚀 Server v14 running on ' + port));
+app.listen(port, () => console.log('🚀 Server v14 LIVE'));
