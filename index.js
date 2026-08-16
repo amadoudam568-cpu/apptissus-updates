@@ -9,7 +9,7 @@ const CLOUD_USER = "admin_tissu";
 const CLOUD_PASS = "Pass2026!";    
 const MONGO_URI = "mongodb+srv://amadoudam568_db_user:mByDycFfVVC6ma9F@cluster0.myuegss.mongodb.net/apptissu?retryWrites=true&w=majority";
 
-mongoose.connect(MONGO_URI).then(() => console.log("🚀 Miroir v15 Super-Turbo Ready"));
+mongoose.connect(MONGO_URI).then(() => console.log("🚀 Miroir v16 Ultra-Complet Ready"));
 
 const schemas = { strict: false };
 const Product = mongoose.model('Product', new mongoose.Schema({}, schemas));
@@ -33,7 +33,7 @@ async function bulkUpsert(model, data, filterKeys) {
   if (!data || !Array.isArray(data) || data.length === 0) return;
   const ops = data.map(item => {
     let filter = {};
-    filterKeys.forEach(k => { if (item[k]) filter[k] = item[k]; });
+    filterKeys.forEach(k => { if (item[k] !== undefined) filter[k] = item[k]; });
     if (Object.keys(filter).length === 0) return null;
     return { updateOne: { filter, update: { $set: item }, upsert: true } };
   }).filter(op => op !== null);
@@ -57,7 +57,7 @@ app.post('/sync/push', checkAuth, async (req, res) => {
       bulkUpsert(Workshop, d.workshop, ['num']),
       bulkUpsert(Lookbook, d.lookbook, ['date'])
     ]);
-    res.status(200).json({ status: "Synced v15" });
+    res.status(200).json({ status: "Full Sync v16 OK" });
   } catch (err) { res.status(500).send(err.message); }
 });
 
@@ -79,4 +79,4 @@ app.get('/sync/pull', checkAuth, async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.listen(port, () => console.log('🚀 Server v15 LIVE'));
+app.listen(port, () => console.log('🚀 Server v16 LIVE'));
