@@ -9,7 +9,7 @@ const CLOUD_USER = "admin_tissu";
 const CLOUD_PASS = "Pass2026!";    
 const MONGO_URI = "mongodb+srv://amadoudam568_db_user:mByDycFfVVC6ma9F@cluster0.myuegss.mongodb.net/apptissu?retryWrites=true&w=majority";
 
-mongoose.connect(MONGO_URI).then(() => console.log("✅ MongoDB Atlas v13 ready"));
+mongoose.connect(MONGO_URI).then(() => console.log("🚀 Miroir Turbo v14 Ready"));
 
 const schemas = { strict: false };
 const Product = mongoose.model('Product', new mongoose.Schema({}, schemas));
@@ -26,44 +26,49 @@ const checkAuth = (req, res, next) => {
   res.status(401).send('Unauthorized');
 };
 
-app.get('/health', checkAuth, (req, res) => res.status(200).send('OK'));
+// ⚡ FONCTION TURBO : ENREGISTREMENT GROUPÉ
+async function bulkUpsert(model, data, filterKey) {
+  if (!data || data.length === 0) return;
+  const ops = data.map(item => ({
+    updateOne: {
+      filter: { [filterKey]: item[filterKey] },
+      update: { $set: item },
+      upsert: true
+    }
+  }));
+  await model.bulkWrite(ops);
+}
 
 app.post('/sync/push', checkAuth, async (req, res) => {
-  const data = req.body;
+  const d = req.body;
   try {
-    if (data.products) for (let p of data.products) await Product.findOneAndUpdate({ name: p.name.trim() }, p, { upsert: true });
-    if (data.sales) for (let s of data.sales) await Sale.findOneAndUpdate({ num: s.num }, s, { upsert: true });
-    if (data.clients) for (let c of data.clients) await Client.findOneAndUpdate({ name: c.name.trim() }, c, { upsert: true });
-    if (data.workshop) for (let w of data.workshop) await Workshop.findOneAndUpdate({ num: w.num }, w, { upsert: true });
-    if (data.lookbook) for (let l of data.lookbook) await Lookbook.findOneAndUpdate({ date: l.date }, l, { upsert: true });
-    
-    if (data.onlineOrders) {
-      for (let o of data.onlineOrders) {
-        await OnlineOrder.findOneAndUpdate({ orderNumber: o.orderNumber }, o, { upsert: true });
-      }
-    }
-    if (data.onlineOrderItems) {
-      for (let oi of data.onlineOrderItems) {
-        await OnlineOrderItem.findOneAndUpdate({ orderNumber: oi.orderNumber, productName: oi.productName }, oi, { upsert: true });
-      }
-    }
-    res.status(200).json({ status: "Success" });
+    // On enregistre tout en mode "Turbo"
+    await Promise.all([
+      bulkUpsert(Product, d.products, 'name'),
+      bulkUpsert(Sale, d.sales, 'num'),
+      bulkUpsert(Client, d.clients, 'name'),
+      bulkUpsert(OnlineOrder, d.onlineOrders, 'orderNumber'),
+      bulkUpsert(OnlineOrderItem, d.onlineOrderItems, 'productName'),
+      bulkUpsert(Workshop, d.workshop, 'num'),
+      bulkUpsert(Lookbook, d.lookbook, 'date')
+    ]);
+    res.status(200).json({ status: "Turbo Synced" });
   } catch (err) { res.status(500).send(err.message); }
 });
 
 app.get('/sync/pull', checkAuth, async (req, res) => {
   try {
-    const results = {
-      products: await Product.find().limit(500),
-      sales: await Sale.find().sort({date: -1}).limit(50),
-      clients: await Client.find(),
-      onlineOrders: await OnlineOrder.find().sort({date: -1}).limit(30),
-      onlineOrderItems: await OnlineOrderItem.find().limit(100),
-      workshop: await Workshop.find().limit(50),
-      lookbook: await Lookbook.find().limit(20)
-    };
-    res.json(results);
+    const [products, sales, clients, onlineOrders, onlineOrderItems, workshop, lookbook] = await Promise.all([
+      Product.find().limit(500),
+      Sale.find().sort({date: -1}).limit(50),
+      Client.find(),
+      OnlineOrder.find().sort({date: -1}).limit(30),
+      OnlineOrderItem.find().limit(100),
+      Workshop.find().limit(50),
+      Lookbook.find().limit(20)
+    ]);
+    res.json({ products, sales, clients, onlineOrders, onlineOrderItems, workshop, lookbook });
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.listen(port, () => console.log('🚀 Server v13 LIVE'));
+app.listen(port, () => console.log('🚀 Server v14 running on ' + port));
