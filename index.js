@@ -3,13 +3,13 @@ const mongoose = require('mongoose');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '100mb' })); // On remonte la limite pour les photos du Lookbook
+app.use(express.json({ limit: '100mb' }));
 
 const CLOUD_USER = "admin_tissu";  
 const CLOUD_PASS = "Pass2026!";    
 const MONGO_URI = "mongodb+srv://amadoudam568_db_user:mByDycFfVVC6ma9F@cluster0.myuegss.mongodb.net/apptissu?retryWrites=true&w=majority";
 
-mongoose.connect(MONGO_URI).then(() => console.log("✅ Miroir Pro v11 - Lookbook Actif"));
+mongoose.connect(MONGO_URI).then(() => console.log("✅ MongoDB Atlas v13 ready"));
 
 const schemas = { strict: false };
 const Product = mongoose.model('Product', new mongoose.Schema({}, schemas));
@@ -35,21 +35,19 @@ app.post('/sync/push', checkAuth, async (req, res) => {
     if (data.sales) for (let s of data.sales) await Sale.findOneAndUpdate({ num: s.num }, s, { upsert: true });
     if (data.clients) for (let c of data.clients) await Client.findOneAndUpdate({ name: c.name.trim() }, c, { upsert: true });
     if (data.workshop) for (let w of data.workshop) await Workshop.findOneAndUpdate({ num: w.num }, w, { upsert: true });
+    if (data.lookbook) for (let l of data.lookbook) await Lookbook.findOneAndUpdate({ date: l.date }, l, { upsert: true });
     
-    // Lookbook Sync
-    if (data.lookbook) {
-      for (let l of data.lookbook) {
-        await Lookbook.findOneAndUpdate({ date: l.date }, l, { upsert: true });
-      }
-    }
-
     if (data.onlineOrders) {
       for (let o of data.onlineOrders) {
         await OnlineOrder.findOneAndUpdate({ orderNumber: o.orderNumber }, o, { upsert: true });
       }
     }
-    
-    res.status(200).json({ status: "Universal Sync Success" });
+    if (data.onlineOrderItems) {
+      for (let oi of data.onlineOrderItems) {
+        await OnlineOrderItem.findOneAndUpdate({ orderNumber: oi.orderNumber, productName: oi.productName }, oi, { upsert: true });
+      }
+    }
+    res.status(200).json({ status: "Success" });
   } catch (err) { res.status(500).send(err.message); }
 });
 
@@ -57,15 +55,15 @@ app.get('/sync/pull', checkAuth, async (req, res) => {
   try {
     const results = {
       products: await Product.find().limit(500),
-      sales: await Sale.find().sort({date: -1}).limit(100),
+      sales: await Sale.find().sort({date: -1}).limit(50),
       clients: await Client.find(),
-      onlineOrders: await OnlineOrder.find().sort({date: -1}).limit(50),
-      onlineOrderItems: await OnlineOrderItem.find().limit(200),
-      workshop: await Workshop.find(),
-      lookbook: await Lookbook.find()
+      onlineOrders: await OnlineOrder.find().sort({date: -1}).limit(30),
+      onlineOrderItems: await OnlineOrderItem.find().limit(100),
+      workshop: await Workshop.find().limit(50),
+      lookbook: await Lookbook.find().limit(20)
     };
     res.json(results);
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.listen(port, () => console.log('🚀 Server v11 ready'));
+app.listen(port, () => console.log('🚀 Server v13 LIVE'));
