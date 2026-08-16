@@ -9,12 +9,15 @@ const CLOUD_USER = "admin_tissu";
 const CLOUD_PASS = "Pass2026!";    
 const MONGO_URI = "mongodb+srv://amadoudam568_db_user:mByDycFfVVC6ma9F@cluster0.myuegss.mongodb.net/apptissu?retryWrites=true&w=majority";
 
-mongoose.connect(MONGO_URI).then(() => console.log("🚀 Miroir Turbo v14 Ready"));
+mongoose.connect(MONGO_URI).then(() => console.log("🚀 Miroir v15 Super-Turbo Ready"));
 
 const schemas = { strict: false };
 const Product = mongoose.model('Product', new mongoose.Schema({}, schemas));
 const Sale = mongoose.model('Sale', new mongoose.Schema({}, schemas));
 const Client = mongoose.model('Client', new mongoose.Schema({}, schemas));
+const Category = mongoose.model('Category', new mongoose.Schema({}, schemas));
+const Supplier = mongoose.model('Supplier', new mongoose.Schema({}, schemas));
+const Transaction = mongoose.model('Transaction', new mongoose.Schema({}, schemas));
 const OnlineOrder = mongoose.model('OnlineOrder', new mongoose.Schema({}, schemas));
 const OnlineOrderItem = mongoose.model('OnlineOrderItem', new mongoose.Schema({}, schemas));
 const Workshop = mongoose.model('Workshop', new mongoose.Schema({}, schemas));
@@ -26,15 +29,15 @@ const checkAuth = (req, res, next) => {
   res.status(401).send('Unauthorized');
 };
 
-// ⚡ FONCTION TURBO
 async function bulkUpsert(model, data, filterKeys) {
-  if (!data || data.length === 0) return;
+  if (!data || !Array.isArray(data) || data.length === 0) return;
   const ops = data.map(item => {
     let filter = {};
-    filterKeys.forEach(k => filter[k] = item[k]);
+    filterKeys.forEach(k => { if (item[k]) filter[k] = item[k]; });
+    if (Object.keys(filter).length === 0) return null;
     return { updateOne: { filter, update: { $set: item }, upsert: true } };
-  });
-  await model.bulkWrite(ops);
+  }).filter(op => op !== null);
+  if (ops.length > 0) await model.bulkWrite(ops);
 }
 
 app.get('/health', checkAuth, (req, res) => res.status(200).send('OK'));
@@ -46,28 +49,34 @@ app.post('/sync/push', checkAuth, async (req, res) => {
       bulkUpsert(Product, d.products, ['name']),
       bulkUpsert(Sale, d.sales, ['num']),
       bulkUpsert(Client, d.clients, ['name']),
+      bulkUpsert(Category, d.categories, ['name']),
+      bulkUpsert(Supplier, d.suppliers, ['name']),
+      bulkUpsert(Transaction, d.transactions, ['desc', 'date']),
       bulkUpsert(OnlineOrder, d.onlineOrders, ['orderNumber']),
       bulkUpsert(OnlineOrderItem, d.onlineOrderItems, ['orderNumber', 'productName']),
       bulkUpsert(Workshop, d.workshop, ['num']),
       bulkUpsert(Lookbook, d.lookbook, ['date'])
     ]);
-    res.status(200).json({ status: "Turbo Synced" });
+    res.status(200).json({ status: "Synced v15" });
   } catch (err) { res.status(500).send(err.message); }
 });
 
 app.get('/sync/pull', checkAuth, async (req, res) => {
   try {
-    const [products, sales, clients, onlineOrders, onlineOrderItems, workshop, lookbook] = await Promise.all([
+    const [products, sales, clients, categories, suppliers, transactions, onlineOrders, onlineOrderItems, workshop, lookbook] = await Promise.all([
       Product.find().limit(500),
       Sale.find().sort({date: -1}).limit(50),
       Client.find(),
+      Category.find(),
+      Supplier.find(),
+      Transaction.find().sort({date: -1}).limit(50),
       OnlineOrder.find().sort({date: -1}).limit(30),
       OnlineOrderItem.find().limit(100),
       Workshop.find().limit(50),
       Lookbook.find().limit(20)
     ]);
-    res.json({ products, sales, clients, onlineOrders, onlineOrderItems, workshop, lookbook });
+    res.json({ products, sales, clients, categories, suppliers, transactions, onlineOrders, onlineOrderItems, workshop, lookbook });
   } catch (err) { res.status(500).send(err.message); }
 });
 
-app.listen(port, () => console.log('🚀 Server v14 LIVE'));
+app.listen(port, () => console.log('🚀 Server v15 LIVE'));
